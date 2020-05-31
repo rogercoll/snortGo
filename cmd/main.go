@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/rogercoll/ipselfie"
+	"github.com/rogercoll/snort"
 )
 
 func main() {
-	err := ipselfie.Watch("wlp58s0")
+	err := snort.Watch("wlp58s0")
 	if err != nil {
 		log.Fatal(err)
 	}
