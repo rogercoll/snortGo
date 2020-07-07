@@ -14,12 +14,6 @@ import (
 	"github.com/rogercoll/snort/pkg/netutils"
 )
 
-type rule struct {
-	transport gopacket.LayerType //UDP, TCP, etc
-	srcPort   gopacket.Endpoint  //goPacket.Endpoint
-	dstPort   gopacket.Endpoint  //goPacket.Endpoint
-}
-
 func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-chan os.Signal) {
 	defer close(iPacket)
 	handler, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
@@ -41,33 +35,32 @@ func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-
 	}
 }
 
-func snort(iPacket *gopacket.Packet, rules *map[rule]bool) {
+func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 	if pTransport := (*iPacket).TransportLayer(); pTransport != nil {
 		fmt.Println(pTransport.LayerType().String())
 		fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
-		fmt.Printf("Src packet: %s\n", pTransport.TransportFlow().Src().String())
 		tmpRule := rule{
 			transport: pTransport.LayerType(),
-			srcPort:   pTransport.TransportFlow().Src(),
+			dstPort:   pTransport.TransportFlow().Dst(),
 		}
-		if _, ok := (*rules)[tmpRule]; ok {
-			fmt.Println("Rule matched executing action")
+		if value, ok := (*rules)[tmpRule]; ok {
+			fmt.Println(value.msg)
 		}
 	}
 }
 
-func Watch(ifaceName string) error {
+func Watch(ifaceName, rulesFile string) error {
+	readRulesFile(rulesFile)
 	iface, err := netutils.GetInterface(ifaceName)
 	if err != nil {
 		return err
 	}
 	tmpRule := rule{transport: layers.LayerTypeTCP,
-		srcPort: layers.NewTCPPortEndpoint(443),
-		//dstPort: layers.NewTCPPortEndpoint(41318),
+		dstPort: layers.NewTCPPortEndpoint(4444),
 	}
 
-	rules := make(map[rule]bool)
-	rules[tmpRule] = true
+	rules := make(map[rule]action)
+	rules[tmpRule] = action{msg: "ALERT: Someone trying tcp request to secured port 4444"}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)

@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	err := snort.Watch("wlp58s0")
+	err := snort.Watch("wlp58s0", "/path/to/file")
 	if err != nil {
 		log.Fatal(err)
 	}
