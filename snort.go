@@ -37,15 +37,23 @@ func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-
 
 func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 	if pTransport := (*iPacket).TransportLayer(); pTransport != nil {
-		fmt.Println(pTransport.LayerType().String())
-		fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
+		//fmt.Println(pTransport.LayerType().String())
+		//fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
 		tmpRule := rule{
 			transport: pTransport.LayerType(),
 			dstPort:   pTransport.TransportFlow().Dst(),
+			srcPort:   pTransport.TransportFlow().Src(),
 		}
-		if value, ok := (*rules)[tmpRule]; ok {
-			fmt.Println(value.msg)
+		for key, value := range *rules {
+			if key.transport == tmpRule.transport || key.transport == -1 {
+				if key.dstPort == tmpRule.dstPort || key.dstPort.EndpointType() == -1 {
+					if key.srcPort == tmpRule.dstPort || key.srcPort.EndpointType() == -1 {
+						fmt.Printf("Packet matched: %v\n", value.msg)
+					}
+				}
+			}
 		}
+
 	}
 }
 
@@ -56,7 +64,8 @@ func Watch(ifaceName, rulesFile string) error {
 		return err
 	}
 	tmpRule := rule{transport: layers.LayerTypeTCP,
-		dstPort: layers.NewTCPPortEndpoint(4444),
+		dstPort: layers.NewTCPPortEndpoint(443),
+		srcPort: gopacket.NewEndpoint(-1, []byte("any")),
 	}
 
 	rules := make(map[rule]action)
