@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"gopkg.in/yaml.v2"
 )
 
@@ -52,6 +53,17 @@ func readRulesFile(filepath string) {
 	err = yaml.Unmarshal(yamlFile, &c)
 	if err != nil {
 		log.Fatalf("Unmarshal: %v", err)
+	}
+	fileRules := make([]rule, len(c.Rules))
+	for i, r := range c.Rules {
+		switch r.Protocol {
+		case "TCP":
+			fileRules[i].transport = layers.LayerTypeTCP
+		case "UDP":
+			fileRules[i].transport = layers.LayerTypeUDP
+		default:
+			fileRules[i].transport = gopacket.RegisterLayerType(-1, gopacket.LayerTypeMetadata{Name: "ANY"})
+		}
 	}
 	fmt.Printf("%+v\n", c)
 }
