@@ -1,9 +1,13 @@
 package snort
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
+	"strconv"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -12,7 +16,7 @@ import (
 
 var (
 	LayerTypeAny = gopacket.RegisterLayerType(-1, gopacket.LayerTypeMetadata{Name: "ANY"})
-	AnyPort      = gopacket.RegisterEndpointType(-1, gopacket.EndpointTypeMetadata{Name: "ANYPORT"})
+	Any          = gopacket.RegisterEndpointType(-1, gopacket.EndpointTypeMetadata{Name: "ANYPORT"})
 )
 
 type rule struct {
@@ -35,15 +39,23 @@ type conf struct {
 	Rules []confRule `yaml:"rules"`
 }
 
-/*
- TCP ANY ANY ANY ANY => tmpRule := rule{transport: layers.LayerTypeTCP}
-
- TCP ANY 443 => tmpRule := rule{transport: layers.LayerTypeTCP,
-		dstPort: layers.NewTCPPortEndpoint(443),
+func formatAddr(addr string) []byte {
+	octets := strings.Split(addr, ".")
+	addrbytes := make([]uint8, 4)
+	for i, octet := range octets {
+		aux, err := strconv.Atoi(octet)
+		if err != nil {
+			log.Fatal(err)
+			return []byte{}
+		}
+		b := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b, uint64(aux))
+		addrbytes[i] = b[0]
 	}
-
-
-*/
+	sAddr := net.IPv4(addrbytes[0], addrbytes[1], addrbytes[2], addrbytes[3])
+	sAddr = sAddr.To4()
+	return sAddr
+}
 
 type action struct {
 	msg string
@@ -61,8 +73,10 @@ func readRulesFile(filepath string) *[]rule {
 	}
 	fileRules := make([]rule, len(c.Rules))
 	for i, r := range c.Rules {
-		fileRules[i].dstPort = gopacket.NewEndpoint(AnyPort, []byte("unused"))
-		fileRules[i].srcPort = gopacket.NewEndpoint(AnyPort, []byte("unused"))
+		fileRules[i].dstPort = gopacket.NewEndpoint(Any, []byte("unused"))
+		fileRules[i].srcPort = gopacket.NewEndpoint(Any, []byte("unused"))
+		fileRules[i].dstAddr = gopacket.NewEndpoint(Any, []byte("unused"))
+		fileRules[i].srcAddr = gopacket.NewEndpoint(Any, []byte("unused"))
 		switch r.Protocol {
 		case "TCP":
 			fileRules[i].transport = layers.LayerTypeTCP
@@ -82,6 +96,12 @@ func readRulesFile(filepath string) *[]rule {
 			}
 		default:
 			fileRules[i].transport = LayerTypeAny
+		}
+		if r.Dst != "-1" {
+			fileRules[i].dstAddr = layers.NewIPEndpoint(formatAddr(r.Dst))
+		}
+		if r.Src != "-1" {
+			fileRules[i].srcAddr = layers.NewIPEndpoint(formatAddr(r.Src))
 		}
 	}
 	fmt.Printf("%+v\n", c)

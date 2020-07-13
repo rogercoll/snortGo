@@ -39,17 +39,25 @@ func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 	if pTransport := (*iPacket).TransportLayer(); pTransport != nil {
 		//fmt.Println(pTransport.LayerType().String())
 		//fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
+		//fmt.Printf("%+v\n", pTransport)
 		tmpRule := rule{
 			transport: pTransport.LayerType(),
 			dstPort:   pTransport.TransportFlow().Dst(),
 			srcPort:   pTransport.TransportFlow().Src(),
 		}
+		if pNetwork := (*iPacket).NetworkLayer(); pNetwork != nil {
+			tmpRule.srcAddr = pNetwork.NetworkFlow().Src()
+			tmpRule.dstAddr = pNetwork.NetworkFlow().Dst()
+		}
 		for key, value := range *rules {
 			if key.transport == tmpRule.transport || key.transport == -1 {
 				if key.dstPort == tmpRule.dstPort || key.dstPort.EndpointType() == -1 {
 					if key.srcPort == tmpRule.dstPort || key.srcPort.EndpointType() == -1 {
-						fmt.Printf("Packet matched: %v\n", value.msg)
-						fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
+						//fmt.Printf("Key Addr: %v   Packet Addr: %v\n", key.srcAddr, tmpRule.srcAddr)
+						if key.srcAddr == tmpRule.srcAddr || key.srcAddr.EndpointType() == -1 {
+							fmt.Printf("Packet matched: %v\n", value.msg)
+							fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
+						}
 					}
 				}
 			}

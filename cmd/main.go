@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	err := snort.Watch("wlp58s0", "/home/neck/Documents/PersonalProjects/GoLang/ipselfie/cmd/myrules.yaml")
+	err := snort.Watch("wlp58s0", "./myrules.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
