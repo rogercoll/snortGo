@@ -14,12 +14,6 @@ import (
 	"github.com/rogercoll/snort/pkg/netutils"
 )
 
-type rule struct {
-	transport gopacket.LayerType //UDP, TCP, etc
-	srcPort   gopacket.Endpoint  //goPacket.Endpoint
-	dstPort   gopacket.Endpoint  //goPacket.Endpoint
-}
-
 func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-chan os.Signal) {
 	defer close(iPacket)
 	handler, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
@@ -41,33 +35,48 @@ func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-
 	}
 }
 
-func snort(iPacket *gopacket.Packet, rules *map[rule]bool) {
+func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 	if pTransport := (*iPacket).TransportLayer(); pTransport != nil {
-		fmt.Println(pTransport.LayerType().String())
-		fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
-		fmt.Printf("Src packet: %s\n", pTransport.TransportFlow().Src().String())
+		//fmt.Println(pTransport.LayerType().String())
+		//fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
+		//fmt.Printf("%+v\n", pTransport)
 		tmpRule := rule{
 			transport: pTransport.LayerType(),
+			dstPort:   pTransport.TransportFlow().Dst(),
 			srcPort:   pTransport.TransportFlow().Src(),
 		}
-		if _, ok := (*rules)[tmpRule]; ok {
-			fmt.Println("Rule matched executing action")
+		if pNetwork := (*iPacket).NetworkLayer(); pNetwork != nil {
+			tmpRule.srcAddr = pNetwork.NetworkFlow().Src()
+			tmpRule.dstAddr = pNetwork.NetworkFlow().Dst()
 		}
+		for key, value := range *rules {
+			if key.transport == tmpRule.transport || key.transport == -1 {
+				if key.dstPort == tmpRule.dstPort || key.dstPort.EndpointType() == -1 {
+					if key.srcPort == tmpRule.dstPort || key.srcPort.EndpointType() == -1 {
+						//fmt.Printf("Key Addr: %v   Packet Addr: %v\n", key.srcAddr, tmpRule.srcAddr)
+						if key.srcAddr == tmpRule.srcAddr || key.srcAddr.EndpointType() == -1 {
+							fmt.Printf("Packet matched: %v\n", value.msg)
+							fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
+						}
+					}
+				}
+			}
+		}
+
 	}
 }
 
-func Watch(ifaceName string) error {
+func Watch(ifaceName, rulesFile string) error {
+	tmpRule := readRulesFile(rulesFile)
 	iface, err := netutils.GetInterface(ifaceName)
 	if err != nil {
 		return err
 	}
-	tmpRule := rule{transport: layers.LayerTypeTCP,
-		srcPort: layers.NewTCPPortEndpoint(443),
-		//dstPort: layers.NewTCPPortEndpoint(41318),
-	}
 
-	rules := make(map[rule]bool)
-	rules[tmpRule] = true
+	rules := make(map[rule]action)
+	for _, r := range *tmpRule {
+		rules[r] = action{msg: "ALERT: Someone trying tcp request to secured port 4444"}
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -75,7 +84,6 @@ func Watch(ifaceName string) error {
 	iPacket := make(chan gopacket.Packet)
 
 	go readInterface(iface, iPacket, c)
-	fmt.Println("Starting to read...")
 	fmt.Println("Starting to read...")
 	for {
 		select {
