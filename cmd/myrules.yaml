@@ -1,0 +1,11 @@
+rules:
+ - protocol: TCP
+   src: 192.168.1.1
+   dst: 192.168.2.34
+   sport: 33
+   dport: 12
+ - protocol: TCP
+   src: 192.168.1.1
+   dst: 192.168.2.34
+   sport: -1
+   dport: 443

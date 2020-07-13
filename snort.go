@@ -49,6 +49,7 @@ func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 				if key.dstPort == tmpRule.dstPort || key.dstPort.EndpointType() == -1 {
 					if key.srcPort == tmpRule.dstPort || key.srcPort.EndpointType() == -1 {
 						fmt.Printf("Packet matched: %v\n", value.msg)
+						fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
 					}
 				}
 			}
@@ -58,18 +59,16 @@ func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 }
 
 func Watch(ifaceName, rulesFile string) error {
-	readRulesFile(rulesFile)
+	tmpRule := readRulesFile(rulesFile)
 	iface, err := netutils.GetInterface(ifaceName)
 	if err != nil {
 		return err
 	}
-	tmpRule := rule{transport: layers.LayerTypeTCP,
-		dstPort: layers.NewTCPPortEndpoint(443),
-		srcPort: gopacket.NewEndpoint(-1, []byte("any")),
-	}
 
 	rules := make(map[rule]action)
-	rules[tmpRule] = action{msg: "ALERT: Someone trying tcp request to secured port 4444"}
+	for _, r := range *tmpRule {
+		rules[r] = action{msg: "ALERT: Someone trying tcp request to secured port 4444"}
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -77,7 +76,6 @@ func Watch(ifaceName, rulesFile string) error {
 	iPacket := make(chan gopacket.Packet)
 
 	go readInterface(iface, iPacket, c)
-	fmt.Println("Starting to read...")
 	fmt.Println("Starting to read...")
 	for {
 		select {
