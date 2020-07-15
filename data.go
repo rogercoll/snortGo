@@ -2,7 +2,6 @@ package snort
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -25,6 +24,13 @@ type rule struct {
 	srcPort   gopacket.Endpoint  //goPacket.Endpoint
 	dstAddr   gopacket.Endpoint  //Destination Address layers.NewIPEndpoint
 	dstPort   gopacket.Endpoint  //goPacket.Endpoint
+	act       action             //what to do when a packet matches
+}
+
+type action struct {
+	Msg   string `yaml:"msg"`
+	Level int8   `yaml:"level"`
+	Cmd   string `yaml:"cmd"`
 }
 
 type confRule struct {
@@ -33,6 +39,7 @@ type confRule struct {
 	Dst      string `yaml:"dst"`
 	SrcP     int16  `yaml:"sport"`
 	DstP     int16  `yaml:"dport"`
+	Action   action `yaml:"action"`
 }
 
 type conf struct {
@@ -57,10 +64,6 @@ func formatAddr(addr string) []byte {
 	return sAddr
 }
 
-type action struct {
-	msg string
-}
-
 func readRulesFile(filepath string) *[]rule {
 	var c conf
 	yamlFile, err := ioutil.ReadFile(filepath)
@@ -73,6 +76,7 @@ func readRulesFile(filepath string) *[]rule {
 	}
 	fileRules := make([]rule, len(c.Rules))
 	for i, r := range c.Rules {
+		fileRules[i].act = r.Action
 		fileRules[i].dstPort = gopacket.NewEndpoint(Any, []byte("unused"))
 		fileRules[i].srcPort = gopacket.NewEndpoint(Any, []byte("unused"))
 		fileRules[i].dstAddr = gopacket.NewEndpoint(Any, []byte("unused"))
@@ -104,6 +108,5 @@ func readRulesFile(filepath string) *[]rule {
 			fileRules[i].srcAddr = layers.NewIPEndpoint(formatAddr(r.Src))
 		}
 	}
-	fmt.Printf("%+v\n", c)
 	return &fileRules
 }

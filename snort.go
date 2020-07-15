@@ -35,7 +35,7 @@ func readInterface(iface *net.Interface, iPacket chan<- gopacket.Packet, stop <-
 	}
 }
 
-func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
+func snort(iPacket *gopacket.Packet, rules *[]rule) {
 	if pTransport := (*iPacket).TransportLayer(); pTransport != nil {
 		//fmt.Println(pTransport.LayerType().String())
 		//fmt.Printf("Dst packet: %s\n", pTransport.TransportFlow().Dst().String())
@@ -49,14 +49,14 @@ func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 			tmpRule.srcAddr = pNetwork.NetworkFlow().Src()
 			tmpRule.dstAddr = pNetwork.NetworkFlow().Dst()
 		}
-		for key, value := range *rules {
+		for _, key := range *rules {
 			if key.transport == tmpRule.transport || key.transport == -1 {
 				if key.dstPort == tmpRule.dstPort || key.dstPort.EndpointType() == -1 {
 					if key.srcPort == tmpRule.dstPort || key.srcPort.EndpointType() == -1 {
 						//fmt.Printf("Key Addr: %v   Packet Addr: %v\n", key.srcAddr, tmpRule.srcAddr)
 						if key.srcAddr == tmpRule.srcAddr || key.srcAddr.EndpointType() == -1 {
-							fmt.Printf("Packet matched: %v\n", value.msg)
-							fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
+							fmt.Printf("%#v\n", key.act)
+							//fmt.Printf("Dst packet port: %s\n", pTransport.TransportFlow().Dst().String())
 						}
 					}
 				}
@@ -67,15 +67,10 @@ func snort(iPacket *gopacket.Packet, rules *map[rule]action) {
 }
 
 func Watch(ifaceName, rulesFile string) error {
-	tmpRule := readRulesFile(rulesFile)
+	rules := readRulesFile(rulesFile)
 	iface, err := netutils.GetInterface(ifaceName)
 	if err != nil {
 		return err
-	}
-
-	rules := make(map[rule]action)
-	for _, r := range *tmpRule {
-		rules[r] = action{msg: "ALERT: Someone trying tcp request to secured port 4444"}
 	}
 
 	c := make(chan os.Signal, 1)
@@ -84,11 +79,11 @@ func Watch(ifaceName, rulesFile string) error {
 	iPacket := make(chan gopacket.Packet)
 
 	go readInterface(iface, iPacket, c)
-	fmt.Println("Starting to read...")
+	fmt.Println("Starting to sniff...")
 	for {
 		select {
 		case actualPacket := <-iPacket:
-			go snort(&actualPacket, &rules)
+			go snort(&actualPacket, rules)
 		case <-c:
 			return errors.New("Program finished by user")
 		}
