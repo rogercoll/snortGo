@@ -1,10 +1,29 @@
-## SnortGo
+# SnortGo
 
-### Temporal
+## Installation
 
-For now, the filename is hardcoded. Inside cmd/ name it `myrules.yaml`.
+```bash
+git clone https://github.com/rogercoll/snortGo.git
+cd cmd/snort
+go build
+```
 
-### Rules file
+## Usage
+
+```bash
+./snort --iface wlan0 --f ./myrules.conf
+```
+
+### Flags
+
+```bash
+Flags:
+      --f string       Rules file (default "/etc/snort.conf")
+  -h, --help           help for snort
+      --iface string   Network interface to scan (default "eth0")
+```
+
+## Rules file
 
 To seek for any port/address write -1
 
